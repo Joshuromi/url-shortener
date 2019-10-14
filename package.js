@@ -18,7 +18,7 @@
     "node": "4.4.5"
   },
   "repository": {
-    "url": "#"
+    "url": "https://github.com/Joshuromi/url-shortener"
   },
   "keywords": [
     "node",
