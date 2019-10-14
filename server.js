@@ -30,33 +30,55 @@ app.get("/api/hello", function (req, res) {
   res.json({greeting: 'hello API'});
 });
 
-app.post("/api/shorturl/new",function(req,res){
-    let url = req.body.url;
+app.post("/api/shorturl/new",function(req,res){  
+  let url = req.body.url;
+  var RegExp = /^https?:\/\/(.*)/i;
+  var protocol = url.match(RegExp);
+    if (!protocol) {
+      return res.json({"error": "invalid URL"});
+    };
+  
     dns.lookup(url.substring(8), function (err, addresses, family) {
-      if(err) res.json({"error":"invalid URL"});
-      if(urls.indexOf(url)===-1){
-      urls.push(url);
-      }
-      res.json({"original_url":url,"short_url":urls.indexOf(url)});
-      
+      if(err){
+        res.json({"error":"invalid URL"});
+      }else{
   MongoClient.connect(mongoUrl, function(err, db) {
   if (err) throw err;
   var dbo = db.db("myurls");
-  var myobj = { shorturl: urls.indexOf(url), originalurl: url };
-  dbo.collection("urls").insertOne(myobj, function(err, res) {
+  dbo.collection("urls").findOne({originalurl: url}, function(err, result){
+    if(result){
+      res.json({"original_url": result.originalurl, "short_url": result.shorturl});
+    }else{
+      dbo.collection("urls").find().sort({_id:-1}).toArray(function(err, result) {
     if (err) throw err;
-    console.log("1 document inserted");
-    db.close();
-  });
-});
-
-      });
+     var newid = result[0]._id + 1;
+    var shorturl = String(newid);
+      
+      dbo.collection("urls").insertOne({"_id": newid, "shorturl": shorturl, "originalurl": url}, function(err, result){
+        if (err) throw err;
+        res.json({"original_url": url, "short_url": shorturl});
+        db.close();
+      }); 
+    });
+  }})
+})
+}});
 });
 
  app.get("/api/shorturl/:indexId",(req,res)=>{
-    let index = req.params.indexId;
-    res.redirect(urls[index]);
- })
+    var index = req.params.indexId;
+    MongoClient.connect(mongoUrl, function(err, db){
+      if (err) throw err;
+      var dbo = db.db("myurls");
+      dbo.collection("urls").findOne({"shorturl": index}, function(err, result){
+        if (err) throw err;
+        console.log(result.originalurl);
+        var originalurl = result.originalurl;
+        res.redirect(originalurl);
+        db.close();
+      })
+    });
+ });
 
 
 // Answer not found to all the wrong routes
